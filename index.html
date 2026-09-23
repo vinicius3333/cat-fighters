@@ -70,12 +70,16 @@
   .card.p1.p2::before { border-top-color: var(--ink); }
   .pad { flex: 1; display: flex; justify-content: space-between; align-items: end; gap: 12px; max-width: 720px; width: 100%; margin: 0 auto; min-height: 150px; padding: 0 4px 6px; }
   .cluster { display: grid; gap: 6px; }
-  .dpad { grid-template-columns: repeat(3, var(--dir)); grid-template-rows: repeat(2, var(--dir)); grid-template-areas: ". up ." "left down right"; --dir: 60px; }
-  .dpad .up { grid-area: up; } .dpad .left { grid-area: left; } .dpad .down { grid-area: down; } .dpad .right { grid-area: right; }
+  .stick { --stick: 124px; --knob: 54px; position: relative; width: var(--stick); height: var(--stick); border-radius: 50%; background: radial-gradient(circle, #1a1410 0%, #241c17 60%, #171310 100%); border: 3px solid #4a3b31; box-shadow: 0 4px 0 #000, inset 0 0 18px rgba(0,0,0,0.8); touch-action: none; }
+  .stick-ring { position: absolute; inset: 18%; border-radius: 50%; border: 2px dashed rgba(243,228,200,0.18); pointer-events: none; }
+  .stick-ring::before, .stick-ring::after { content: ""; position: absolute; background: rgba(243,228,200,0.14); pointer-events: none; }
+  .stick-ring::before { left: 50%; top: -14%; width: 2px; height: 128%; margin-left: -1px; }
+  .stick-ring::after { top: 50%; left: -14%; height: 2px; width: 128%; margin-top: -1px; }
+  .stick-knob { position: absolute; left: 50%; top: 50%; width: var(--knob); height: var(--knob); margin: calc(var(--knob) / -2) 0 0 calc(var(--knob) / -2); border-radius: 50%; background: radial-gradient(circle at 40% 35%, #5c4a3c, #2e241d 65%, #1a1410); border: 3px solid rgba(0,0,0,0.6); box-shadow: 0 4px 0 rgba(0,0,0,0.8), inset 0 3px 0 rgba(255,255,255,0.12); pointer-events: none; transition: transform 0.08s; }
+  .stick.active .stick-knob { transition: none; background: radial-gradient(circle at 40% 35%, #8a6b50, #4a3628 65%, #2a1e16); border-color: var(--p1); }
   .actions { grid-template-columns: repeat(2, var(--round)); grid-template-rows: repeat(2, var(--round)); grid-template-areas: "punch kick" "special special"; --round: 74px; column-gap: 10px; row-gap: 4px; align-items: start; }
   .actions .punch { grid-area: punch; } .actions .kick { grid-area: kick; margin-top: -12px; } .actions .special { grid-area: special; justify-self: center; margin-top: -6px; }
   .btn { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink); font-family: var(--arcade); cursor: pointer; text-shadow: 1px 1px 0 #000; user-select: none; -webkit-user-select: none; touch-action: none; }
-  .btn.dir { width: var(--dir); height: var(--dir); font-size: 15px; background: linear-gradient(180deg, #3a2e26, #1c1613); border: 3px solid #4a3b31; border-radius: 10px; box-shadow: 0 4px 0 #000, inset 0 2px 0 rgba(255,255,255,0.08); }
   .btn.round { width: var(--round); height: var(--round); border-radius: 50%; border: 3px solid rgba(0,0,0,0.6); box-shadow: 0 5px 0 rgba(0,0,0,0.85), inset 0 3px 0 rgba(255,255,255,0.25), inset 0 -6px 0 rgba(0,0,0,0.25); font-size: 20px; gap: 1px; }
   .btn.round small { font-size: 6px; letter-spacing: 0.06em; opacity: 0.9; }
   .btn.punch { background: radial-gradient(circle at 40% 35%, #ff8f6b, #d8402c 60%, #8e2318); }
@@ -94,7 +98,7 @@
     .hint { display: none; }
     .pad { position: fixed; inset: 0; display: block; max-width: none; min-height: 0; margin: 0; pointer-events: none; }
     .cluster { position: absolute; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); pointer-events: auto; opacity: 0.82; }
-    .dpad { left: calc(10px + env(safe-area-inset-left, 0px)); --dir: 50px; gap: 4px; }
+    .stick { left: calc(12px + env(safe-area-inset-left, 0px)); --stick: 104px; --knob: 46px; }
     .actions { right: calc(10px + env(safe-area-inset-right, 0px)); --round: 60px; }
     .btn.round { font-size: 16px; }
     .pad.title .cluster { display: none; }
@@ -157,11 +161,9 @@
     </div>
   </div>
   <div class="pad" id="pad">
-    <div class="cluster dpad">
-      <div class="btn dir up" data-key="jump" aria-label="Jump">&#9650;</div>
-      <div class="btn dir left" data-key="left" aria-label="Move left">&#9664;</div>
-      <div class="btn dir down" data-key="down" aria-label="Crouch">&#9660;</div>
-      <div class="btn dir right" data-key="right" aria-label="Move right">&#9654;</div>
+    <div class="cluster stick" id="stick" aria-label="Move: drag sideways to walk, down to crouch, flick up to jump">
+      <div class="stick-ring"></div>
+      <div class="stick-knob" id="stick-knob"></div>
     </div>
     <div class="cluster actions">
       <div class="btn round punch" data-key="punch"><span>P</span><small>PUNCH</small></div>
@@ -169,7 +171,7 @@
       <div class="btn round special" data-key="special"><span>S</span><small>SPECIAL</small></div>
     </div>
   </div>
-  <div class="hint">A/D move &middot; S crouch (ducks high kicks) &middot; W jump &middot; J punch &middot; K kick (also in the air) &middot; L special when the meter is full &middot; Enter start &middot; On touch screens: &#9650; jumps</div>
+  <div class="hint">A/D move &middot; S crouch (ducks high kicks) &middot; W jump &middot; J punch &middot; K kick (also in the air) &middot; L special when the meter is full &middot; Enter start &middot; On touch screens: drag the stick, push up to jump</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
@@ -868,6 +870,45 @@
     try { el.requestFullscreen().catch(function () {}); } catch (e) {}
   }
   startButton.addEventListener("click", function () { enterFullscreen(); startMatch(); });
+
+  // Virtual joystick: sideways walks, down crouches, a push past the top edge jumps once.
+  var stickEl = document.getElementById("stick");
+  var knobEl = document.getElementById("stick-knob");
+  var stick = { pointerId: null, jumpArmed: true };
+  var STICK_DEAD = 0.28, STICK_DOWN = 0.5, STICK_UP = -0.55;
+  function stickReset() {
+    stick.pointerId = null; stick.jumpArmed = true;
+    input.left = input.right = input.down = false;
+    stickEl.classList.remove("active");
+    knobEl.style.transform = "";
+  }
+  function stickUpdate(e) {
+    var box = stickEl.getBoundingClientRect();
+    var radius = box.width / 2;
+    var dx = (e.clientX - (box.left + radius)) / radius;
+    var dy = (e.clientY - (box.top + radius)) / radius;
+    var len = Math.hypot(dx, dy);
+    if (len > 1) { dx /= len; dy /= len; }
+    var travel = radius * 0.62;
+    knobEl.style.transform = "translate(" + Math.round(dx * travel) + "px, " + Math.round(dy * travel) + "px)";
+    input.left = dx < -STICK_DEAD;
+    input.right = dx > STICK_DEAD;
+    input.down = dy > STICK_DOWN;
+    if (dy < STICK_UP) { if (stick.jumpArmed) { pressedThisFrame.jump = true; stick.jumpArmed = false; } }
+    else if (dy > STICK_UP + 0.2) { stick.jumpArmed = true; }
+  }
+  stickEl.addEventListener("pointerdown", function (e) {
+    if (stick.pointerId !== null) return;
+    e.preventDefault();
+    stick.pointerId = e.pointerId;
+    stickEl.setPointerCapture(e.pointerId);
+    stickEl.classList.add("active");
+    stickUpdate(e);
+  });
+  stickEl.addEventListener("pointermove", function (e) { if (e.pointerId === stick.pointerId) { e.preventDefault(); stickUpdate(e); } });
+  ["pointerup", "pointercancel"].forEach(function (type) {
+    stickEl.addEventListener(type, function (e) { if (e.pointerId === stick.pointerId) { e.preventDefault(); stickReset(); } });
+  });
 
   // Online play: the host simulates and streams snapshots, the guest streams its buttons.
   var net = { role: null, peer: null, conn: null, ready: false, guestCat: null, remote: { held: {}, pressed: {} } };
