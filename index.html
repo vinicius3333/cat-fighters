@@ -1,3 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#12100e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Cat Fighters</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
 <style>
@@ -62,7 +71,7 @@
   .pad { flex: 1; display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 12px; max-width: 720px; width: 100%; margin: 0 auto; min-height: 150px; }
   .cluster { display: grid; gap: 8px; }
   .dpad { grid-template-columns: 1fr 1fr 1fr; }
-  .actions { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .actions { grid-template-columns: 1fr 1fr; }
   .btn { height: 64px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, var(--panel-hi), var(--panel)); border: 3px solid var(--line); color: var(--ink); font-family: var(--arcade); font-size: 11px; box-shadow: 0 4px 0 #000, inset 0 2px 0 rgba(255,255,255,0.06); cursor: pointer; text-shadow: 1px 1px 0 #000; }
   .btn.down { background: #3a2a1e; border-color: var(--p1); transform: translateY(3px); box-shadow: 0 1px 0 #000; }
   .btn.special { color: var(--ink-muted); }
@@ -72,6 +81,43 @@
   .hint { text-align: center; font-size: 7px; color: var(--ink-muted); line-height: 1.8; }
   @media (min-width: 900px) and (hover: hover) { .pad { display: none; } .hint { display: block; } }
   @media (max-width: 899px) { .hint { display: none; } }
+  /* Phone in landscape: the stage fills the height and the touch pad floats over its corners. */
+  @media (orientation: landscape) and (max-height: 520px) {
+    .app { padding: 0; gap: 0; flex-direction: row; justify-content: center; align-items: center; }
+    .screen { height: 100%; width: auto; max-width: 100%; max-height: 100%; margin: 0; border-width: 0; box-shadow: none; }
+    .hint { display: none; }
+    .pad { position: fixed; inset: 0; display: block; max-width: none; min-height: 0; margin: 0; pointer-events: none; }
+    .cluster { position: absolute; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); pointer-events: auto; opacity: 0.82; }
+    .dpad { left: calc(10px + env(safe-area-inset-left, 0px)); grid-template-columns: 54px 54px 54px; }
+    .actions { right: calc(10px + env(safe-area-inset-right, 0px)); grid-template-columns: 54px 54px; }
+    .btn { height: 54px; font-size: 8px; }
+    .pad.title .cluster { display: none; }
+  }
+  /* Title screen scales with the stage height: mid-size stages (phone landscape) and short ones (phone portrait). */
+  @container (max-height: 460px) {
+    .screen .overlay { gap: 5px; padding: 4px 8px; }
+    .screen .overlay h1 { width: min(40cqw, 260px); }
+    .screen .overlay .logo { max-height: 17cqh; }
+    .screen .overlay p { font-size: 7px; line-height: 1.5; max-width: 62ch; }
+    .screen .card { width: 64px; padding: 3px; gap: 2px; }
+    .screen .card .move { display: none; }
+    .screen .overlay button { padding: 6px 14px; font-size: 9px; }
+    .screen .overlay button.ghost { padding: 4px 10px; font-size: 7px; }
+    .screen #qr img, .screen #qr canvas { width: 72px; height: 72px; }
+  }
+  @container (max-height: 300px) {
+    .screen .overlay { gap: 3px; padding: 3px 6px; }
+    .screen .overlay h1 { width: min(38cqw, 220px); }
+    .screen .overlay .logo { max-height: 15cqh; }
+    .screen .overlay p { font-size: 5px; line-height: 1.5; }
+    .screen .card { width: 50px; padding: 2px; gap: 1px; }
+    .screen .card .name { font-size: 5px; }
+    .screen .card .tag { font-size: 4px; }
+    .screen .overlay button { padding: 4px 10px; font-size: 7px; }
+    .screen .overlay button.ghost { padding: 3px 8px; font-size: 6px; }
+    .screen #qr img, .screen #qr canvas { width: 56px; height: 56px; }
+    .screen #online-text { font-size: 5px; line-height: 1.4; }
+  }
   @media (max-width: 520px) {
     .card .move { display: none; }
     .card { width: 62px; padding: 3px; gap: 2px; }
@@ -82,6 +128,9 @@
     .overlay button { padding: 6px 16px; }
   }
 </style>
+</head>
+<body>
+
 
 <div class="app">
   <div class="screen">
@@ -693,7 +742,9 @@
   }
 
   var specialButton = document.querySelector(".btn.special");
+  var padEl = document.getElementById("pad");
   function render() {
+    padEl.classList.toggle("title", phase === "title");
     var me = net.role === "guest" ? p2 : p1;
     if (specialButton) specialButton.classList.toggle("ready", !!me && me.meter >= METER_MAX && phase === "fight");
     ctx.save();
@@ -804,7 +855,13 @@
     el.addEventListener("pointercancel", release);
     el.addEventListener("pointerleave", release);
   });
-  startButton.addEventListener("click", startMatch);
+  function enterFullscreen() {
+    var coarse = window.matchMedia("(pointer: coarse)").matches;
+    var el = document.documentElement;
+    if (!coarse || document.fullscreenElement || !el.requestFullscreen) return;
+    try { el.requestFullscreen().catch(function () {}); } catch (e) {}
+  }
+  startButton.addEventListener("click", function () { enterFullscreen(); startMatch(); });
 
   // Online play: the host simulates and streams snapshots, the guest streams its buttons.
   var net = { role: null, peer: null, conn: null, ready: false, guestCat: null, remote: { held: {}, pressed: {} } };
@@ -927,3 +984,6 @@
 
 })();
 </script>
+
+</body>
+</html>
