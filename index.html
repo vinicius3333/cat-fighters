@@ -36,6 +36,13 @@
   @keyframes fight-pulse { 0%, 100% { box-shadow: 0 4px 0 #6e2510, 0 4px 0 2px #2a0c04, 0 0 10px rgba(242,140,40,0.3); } 50% { box-shadow: 0 4px 0 #6e2510, 0 4px 0 2px #2a0c04, 0 0 22px rgba(255,190,80,0.7); } }
   .overlay button:active { transform: translate(0, 3px); box-shadow: 0 1px 0 #6e2510, 0 1px 0 2px #2a0c04; animation: none; }
   .overlay button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .online { display: grid; gap: 6px; justify-items: center; }
+  .overlay button.ghost { background: rgba(0,0,0,0.55); color: var(--ink); border-color: var(--line); font-size: clamp(7px, 1.6vw, 10px); padding: 8px 12px; animation: none; box-shadow: 0 3px 0 #000; }
+  #online-panel { display: grid; gap: 6px; justify-items: center; }
+  #qr { background: #fff; padding: 6px; line-height: 0; }
+  #qr img, #qr canvas { width: 108px; height: 108px; image-rendering: pixelated; }
+  #room-code { font-size: clamp(9px, 2.2vw, 14px); letter-spacing: 0.2em; color: var(--p1); text-shadow: 2px 2px 0 #000; }
+  #online-text { font-size: clamp(6px, 1.5vw, 9px); color: var(--ink); margin: 0; max-width: 36ch; line-height: 1.7; }
   .select { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
   .card { width: clamp(66px, 16vw, 104px); padding: 4px; background: linear-gradient(180deg, rgba(40,28,22,0.92), rgba(14,10,8,0.95)); border: 3px solid var(--line); box-shadow: 0 3px 0 #000, inset 0 0 0 1px rgba(255,255,255,0.05); cursor: pointer; display: grid; gap: 3px; justify-items: center; position: relative; transition: transform 0.08s; }
   .card:active { transform: translateY(2px); }
@@ -84,6 +91,14 @@
       <p id="overlay-text">Pick your cat. Tap once for you, tap again to hand it to the CPU. Land hits to fill the special meter, then press SPEC.</p>
       <div class="select" id="select"></div>
       <button id="start" type="button">FIGHT</button>
+      <div class="online" id="online">
+        <button id="btn-online" type="button" class="ghost">PLAY ONLINE</button>
+        <div id="online-panel" hidden>
+          <div id="qr"></div>
+          <div id="room-code"></div>
+          <p id="online-text"></p>
+        </div>
+      </div>
     </div>
   </div>
   <div class="pad" id="pad">
@@ -102,6 +117,8 @@
   <div class="hint">A/D move &middot; S crouch (ducks high kicks) &middot; W jump &middot; J punch &middot; K kick (also in the air) &middot; L special when the meter is full &middot; Enter start</div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 (function () {
   var FIGHTERS = {
@@ -465,8 +482,18 @@
   }
 
   function startMatch() {
+    if (net.role === "guest") {
+      if (!net.ready) return;
+      net.conn.send({ t: "join", cat: selection.p1 });
+      overlayText.textContent = "Waiting for the host to start the match.";
+      startButton.hidden = true;
+      return;
+    }
+    if (net.role === "host" && !net.guestCat) return;
+    var p2Cat = net.role === "host" ? net.guestCat : selection.p2;
     p1 = makeFighter(selection.p1, 140, 1, false);
-    p2 = makeFighter(selection.p2, 340, -1, true);
+    p2 = makeFighter(p2Cat, 340, -1, net.role !== "host");
+    if (net.role === "host") net.conn.send({ t: "start", p1: selection.p1, p2: p2Cat });
     startRound();
   }
   function startRound() {
@@ -496,8 +523,15 @@
       phase = "title";
       var youWon = p1.wins > p2.wins;
       var cpuName = FIGHTERS[p2.id].name;
-      overlayText.textContent = youWon ? "You win the match. " + cpuName + " bows. Pick your cats for the rematch." : (p1.wins === p2.wins ? "Draw. Both cats are exhausted. Pick again." : cpuName + " wins the match. Pick your cats and try again.");
+      if (net.role === "host") {
+        var text = p1.wins === p2.wins ? "Draw. Both cats are exhausted." : FIGHTERS[(youWon ? p1 : p2).id].name + " wins the match.";
+        overlayText.textContent = text + " Press REMATCH to fight again.";
+        if (net.ready) net.conn.send({ t: "end", text: text + " Waiting for the host to start a rematch." });
+      } else {
+        overlayText.textContent = youWon ? "You win the match. " + cpuName + " bows. Pick your cats for the rematch." : (p1.wins === p2.wins ? "Draw. Both cats are exhausted. Pick again." : cpuName + " wins the match. Pick your cats and try again.");
+      }
       startButton.textContent = "REMATCH";
+      startButton.hidden = false;
       overlay.hidden = false;
     } else {
       startRound();
@@ -505,14 +539,16 @@
   }
 
   function update(dt) {
-    if (phase === "title") { drawPortraits(dt); return; }
+    if (phase === "title") drawPortraits(dt);
+    if (net.role === "guest") return;
+    if (phase === "title") return;
     if (phase === "ready") {
       phaseTimer -= dt;
       if (phaseTimer <= 0) phase = "fight";
     }
     if (phase === "fight") {
       controlHuman(p1, dt);
-      controlBot(p2, p1, dt);
+      if (net.role === "host") controlRemote(p2); else controlBot(p2, p1, dt);
       roundTimer -= dt;
       if (roundTimer <= 0) { roundTimer = 0; timeUp(); }
     }
@@ -658,7 +694,8 @@
 
   var specialButton = document.querySelector(".btn.special");
   function render() {
-    if (specialButton) specialButton.classList.toggle("ready", !!p1 && p1.meter >= METER_MAX && phase === "fight");
+    var me = net.role === "guest" ? p2 : p1;
+    if (specialButton) specialButton.classList.toggle("ready", !!me && me.meter >= METER_MAX && phase === "fight");
     ctx.save();
     if (shake > 0) ctx.translate((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
     drawStage();
@@ -721,7 +758,7 @@
       hudGhost.p1 = p1.hp >= hudGhost.p1 ? p1.hp : Math.max(p1.hp, hudGhost.p1 - ghostRate);
       hudGhost.p2 = p2.hp >= hudGhost.p2 ? p2.hp : Math.max(p2.hp, hudGhost.p2 - ghostRate);
       drawBar(14, p1.hp, false, FIGHTERS[p1.id].color, FIGHTERS[p1.id].name, p1.wins, p1.meter, "p1");
-      drawBar(W - 14, p2.hp, true, FIGHTERS[p2.id].color, FIGHTERS[p2.id].name + " (CPU)", p2.wins, p2.meter, "p2");
+      drawBar(W - 14, p2.hp, true, FIGHTERS[p2.id].color, FIGHTERS[p2.id].name + (net.role ? " (P2)" : " (CPU)"), p2.wins, p2.meter, "p2");
       drawTimer(Math.ceil(roundTimer));
       if (phase === "ready") {
         var showRound = phaseTimer > 0.6;
@@ -736,7 +773,10 @@
   var last = performance.now();
   function loop(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
-    update(dt); render();
+    update(dt);
+    if (net.role === "host" && net.ready && phase !== "title") sendSnapshot();
+    if (net.role === "guest" && net.ready) sendInput();
+    render();
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
@@ -765,5 +805,125 @@
     el.addEventListener("pointerleave", release);
   });
   startButton.addEventListener("click", startMatch);
+
+  // Online play: the host simulates and streams snapshots, the guest streams its buttons.
+  var net = { role: null, peer: null, conn: null, ready: false, guestCat: null, remote: { held: {}, pressed: {} } };
+  var onlineButton = document.getElementById("btn-online");
+  var onlinePanel = document.getElementById("online-panel");
+  var qrEl = document.getElementById("qr");
+  var roomCodeEl = document.getElementById("room-code");
+  var onlineText = document.getElementById("online-text");
+  var ROOM_PREFIX = "catfighters-";
+
+  function randomRoom() {
+    var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", out = "";
+    for (var i = 0; i < 5; i++) out += chars[Math.floor(Math.random() * chars.length)];
+    return out;
+  }
+  function roomUrl(id) { return location.origin + location.pathname + "?room=" + id; }
+  function showOnlinePanel(text) { onlinePanel.hidden = false; onlineButton.hidden = true; onlineText.textContent = text; }
+
+  function hostRoom() {
+    if (typeof Peer === "undefined" || !/^https?:$/.test(location.protocol) || /claude\.ai$/.test(location.hostname)) {
+      showOnlinePanel("Online play needs the public link: vinicius3333.github.io/cat-fighters");
+      return;
+    }
+    var id = randomRoom();
+    net.role = "host";
+    net.peer = new Peer(ROOM_PREFIX + id);
+    showOnlinePanel("Creating room...");
+    startButton.hidden = true;
+    net.peer.on("open", function () {
+      qrEl.innerHTML = "";
+      new QRCode(qrEl, { text: roomUrl(id), width: 128, height: 128, correctLevel: QRCode.CorrectLevel.M });
+      roomCodeEl.textContent = id;
+      onlineText.textContent = "Scan the code with the other phone, or open the link and add ?room=" + id + ". Pick your cat while you wait.";
+    });
+    net.peer.on("connection", function (conn) { net.conn = conn; bindConnection(conn); });
+    net.peer.on("error", function (err) { onlineText.textContent = "Connection failed (" + err.type + "). Reload and try again."; });
+  }
+
+  function joinRoom(id) {
+    if (typeof Peer === "undefined") return;
+    net.role = "guest";
+    net.peer = new Peer();
+    showOnlinePanel("Joining room " + id + "...");
+    qrEl.hidden = true;
+    roomCodeEl.textContent = id;
+    startButton.textContent = "READY";
+    overlayText.textContent = "You are player 2. Pick your cat, then press READY.";
+    net.peer.on("open", function () {
+      net.conn = net.peer.connect(ROOM_PREFIX + id, { reliable: true });
+      bindConnection(net.conn);
+    });
+    net.peer.on("error", function (err) { onlineText.textContent = "Could not join room " + id + " (" + err.type + "). Ask the host for a new code."; });
+  }
+
+  function bindConnection(conn) {
+    conn.on("open", function () {
+      net.ready = true;
+      onlineText.textContent = net.role === "host" ? "Player 2 connected. Waiting for them to pick a cat." : "Connected. Pick your cat and press READY.";
+    });
+    conn.on("data", onNetData);
+    conn.on("close", function () {
+      net.ready = false;
+      onlineText.textContent = "The other player disconnected. Reload to play again.";
+      if (phase !== "title") { phase = "title"; overlay.hidden = false; }
+    });
+  }
+
+  function onNetData(msg) {
+    if (net.role === "host") {
+      if (msg.t === "join") { net.guestCat = msg.cat; startMatch(); }
+      else if (msg.t === "in") { net.remote.held = msg.h; Object.keys(msg.p).forEach(function (k) { if (msg.p[k]) net.remote.pressed[k] = true; }); }
+      return;
+    }
+    if (msg.t === "start") {
+      p1 = makeFighter(msg.p1, 140, 1, false); p2 = makeFighter(msg.p2, 340, -1, false);
+      overlay.hidden = true; phase = "ready";
+    } else if (msg.t === "s") {
+      applySnapshot(msg);
+    } else if (msg.t === "end") {
+      phase = "title"; overlay.hidden = false; startButton.hidden = true;
+      overlayText.textContent = msg.text;
+    }
+  }
+
+  function controlRemote(f) {
+    var h = net.remote.held, pr = net.remote.pressed;
+    act(f, { move: (h.right ? 1 : 0) - (h.left ? 1 : 0), down: !!h.down, jump: !!pr.jump, punch: !!pr.punch, kick: !!pr.kick, special: !!pr.special });
+    net.remote.pressed = {};
+  }
+  function sendInput() {
+    net.conn.send({ t: "in", h: input, p: pressedThisFrame });
+    pressedThisFrame.jump = pressedThisFrame.punch = pressedThisFrame.kick = pressedThisFrame.special = false;
+  }
+  function packFighter(f) {
+    return [f.id, Math.round(f.x), Math.round(f.y), f.facing, f.state, f.frame, f.hp, f.wins, f.meter,
+      f.trail.map(function (t) { return [Math.round(t.x), Math.round(t.y), t.frame]; })];
+  }
+  function unpackFighter(f, d) {
+    if (!f || f.id !== d[0]) f = makeFighter(d[0], d[1], d[3], false);
+    f.x = d[1]; f.y = d[2]; f.facing = d[3]; f.state = d[4]; f.frame = d[5]; f.hp = d[6]; f.wins = d[7]; f.meter = d[8];
+    f.trail = d[9].map(function (t) { return { x: t[0], y: t[1], frame: t[2] }; });
+    return f;
+  }
+  function sendSnapshot() {
+    net.conn.send({
+      t: "s", ph: phase, pt: phaseTimer, rt: roundTimer, sh: shake, hf: hitFlash, cb: comboBanner, sb: specialBanner,
+      pr: projectiles.map(function (pr) { return [pr.kind, Math.round(pr.x), pr.height, pr.vx, pr.spin]; }),
+      a: packFighter(p1), b: packFighter(p2)
+    });
+  }
+  function applySnapshot(m) {
+    p1 = unpackFighter(p1, m.a); p2 = unpackFighter(p2, m.b);
+    phase = m.ph; phaseTimer = m.pt; roundTimer = m.rt; shake = m.sh; hitFlash = m.hf; comboBanner = m.cb; specialBanner = m.sb;
+    projectiles = m.pr.map(function (d) { return { kind: d[0], x: d[1], height: d[2], vx: d[3], spin: d[4], owner: null }; });
+  }
+
+  onlineButton.addEventListener("click", hostRoom);
+  var roomParam = new URLSearchParams(location.search).get("room");
+  if (roomParam) joinRoom(roomParam.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+
 })();
 </script>
