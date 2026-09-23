@@ -68,16 +68,22 @@
   .card.p1::before, .card.p2::before { content: ""; position: absolute; top: -9px; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--p1); border-top-width: 6px; }
   .card.p2::before { border-top-color: var(--p2); }
   .card.p1.p2::before { border-top-color: var(--ink); }
-  .pad { flex: 1; display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 12px; max-width: 720px; width: 100%; margin: 0 auto; min-height: 150px; }
-  .cluster { display: grid; gap: 8px; }
-  .dpad { grid-template-columns: 1fr 1fr 1fr; }
-  .actions { grid-template-columns: 1fr 1fr; }
-  .btn { height: 64px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, var(--panel-hi), var(--panel)); border: 3px solid var(--line); color: var(--ink); font-family: var(--arcade); font-size: 11px; box-shadow: 0 4px 0 #000, inset 0 2px 0 rgba(255,255,255,0.06); cursor: pointer; text-shadow: 1px 1px 0 #000; }
-  .btn.down { background: #3a2a1e; border-color: var(--p1); transform: translateY(3px); box-shadow: 0 1px 0 #000; }
-  .btn.special { color: var(--ink-muted); }
-  .btn.special.ready { color: var(--gold); border-color: var(--gold); box-shadow: 0 4px 0 #000, 0 0 14px rgba(246,213,92,0.5); animation: special-ready 0.6s steps(2) infinite; }
-  @keyframes special-ready { 50% { border-color: #fff4dc; } }
-  .btn .k { font-size: 7px; color: var(--ink-muted); margin-left: 6px; }
+  .pad { flex: 1; display: flex; justify-content: space-between; align-items: end; gap: 12px; max-width: 720px; width: 100%; margin: 0 auto; min-height: 150px; padding: 0 4px 6px; }
+  .cluster { display: grid; gap: 6px; }
+  .dpad { grid-template-columns: repeat(3, var(--dir)); grid-template-rows: repeat(2, var(--dir)); grid-template-areas: ". up ." "left down right"; --dir: 60px; }
+  .dpad .up { grid-area: up; } .dpad .left { grid-area: left; } .dpad .down { grid-area: down; } .dpad .right { grid-area: right; }
+  .actions { grid-template-columns: repeat(2, var(--round)); grid-template-rows: repeat(2, var(--round)); grid-template-areas: "punch kick" "special special"; --round: 74px; column-gap: 10px; row-gap: 4px; align-items: start; }
+  .actions .punch { grid-area: punch; } .actions .kick { grid-area: kick; margin-top: -12px; } .actions .special { grid-area: special; justify-self: center; margin-top: -6px; }
+  .btn { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink); font-family: var(--arcade); cursor: pointer; text-shadow: 1px 1px 0 #000; user-select: none; -webkit-user-select: none; touch-action: none; }
+  .btn.dir { width: var(--dir); height: var(--dir); font-size: 15px; background: linear-gradient(180deg, #3a2e26, #1c1613); border: 3px solid #4a3b31; border-radius: 10px; box-shadow: 0 4px 0 #000, inset 0 2px 0 rgba(255,255,255,0.08); }
+  .btn.round { width: var(--round); height: var(--round); border-radius: 50%; border: 3px solid rgba(0,0,0,0.6); box-shadow: 0 5px 0 rgba(0,0,0,0.85), inset 0 3px 0 rgba(255,255,255,0.25), inset 0 -6px 0 rgba(0,0,0,0.25); font-size: 20px; gap: 1px; }
+  .btn.round small { font-size: 6px; letter-spacing: 0.06em; opacity: 0.9; }
+  .btn.punch { background: radial-gradient(circle at 40% 35%, #ff8f6b, #d8402c 60%, #8e2318); }
+  .btn.kick { background: radial-gradient(circle at 40% 35%, #8fb4ff, #3f6fd6 60%, #23407f); }
+  .btn.special { background: radial-gradient(circle at 40% 35%, #6a5c4a, #3a3128 60%, #1f1a15); color: var(--ink-muted); }
+  .btn.special.ready { background: radial-gradient(circle at 40% 35%, #fff2b0, #f0c23a 60%, #9a6f12); color: #3a2400; text-shadow: 1px 1px 0 rgba(255,255,255,0.4); box-shadow: 0 5px 0 rgba(0,0,0,0.85), 0 0 18px rgba(246,213,92,0.7), inset 0 3px 0 rgba(255,255,255,0.4); animation: special-ready 0.6s steps(2) infinite; }
+  @keyframes special-ready { 50% { filter: brightness(1.25); } }
+  .btn.pressed { transform: translateY(4px); box-shadow: 0 1px 0 #000, inset 0 2px 0 rgba(0,0,0,0.2); filter: brightness(1.15); }
   .hint { text-align: center; font-size: 7px; color: var(--ink-muted); line-height: 1.8; }
   @media (min-width: 900px) and (hover: hover) { .pad { display: none; } .hint { display: block; } }
   @media (max-width: 899px) { .hint { display: none; } }
@@ -88,9 +94,9 @@
     .hint { display: none; }
     .pad { position: fixed; inset: 0; display: block; max-width: none; min-height: 0; margin: 0; pointer-events: none; }
     .cluster { position: absolute; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); pointer-events: auto; opacity: 0.82; }
-    .dpad { left: calc(10px + env(safe-area-inset-left, 0px)); grid-template-columns: 54px 54px 54px; }
-    .actions { right: calc(10px + env(safe-area-inset-right, 0px)); grid-template-columns: 54px 54px; }
-    .btn { height: 54px; font-size: 8px; }
+    .dpad { left: calc(10px + env(safe-area-inset-left, 0px)); --dir: 50px; gap: 4px; }
+    .actions { right: calc(10px + env(safe-area-inset-right, 0px)); --round: 60px; }
+    .btn.round { font-size: 16px; }
     .pad.title .cluster { display: none; }
   }
   /* Title screen scales with the stage height: mid-size stages (phone landscape) and short ones (phone portrait). */
@@ -152,18 +158,18 @@
   </div>
   <div class="pad" id="pad">
     <div class="cluster dpad">
-      <div class="btn" data-key="left">&larr;</div>
-      <div class="btn" data-key="down">&darr;</div>
-      <div class="btn" data-key="right">&rarr;</div>
+      <div class="btn dir up" data-key="jump" aria-label="Jump">&#9650;</div>
+      <div class="btn dir left" data-key="left" aria-label="Move left">&#9664;</div>
+      <div class="btn dir down" data-key="down" aria-label="Crouch">&#9660;</div>
+      <div class="btn dir right" data-key="right" aria-label="Move right">&#9654;</div>
     </div>
     <div class="cluster actions">
-      <div class="btn" data-key="jump">JUMP</div>
-      <div class="btn" data-key="punch">PUNCH</div>
-      <div class="btn" data-key="kick">KICK</div>
-      <div class="btn special" data-key="special">SPEC</div>
+      <div class="btn round punch" data-key="punch"><span>P</span><small>PUNCH</small></div>
+      <div class="btn round kick" data-key="kick"><span>K</span><small>KICK</small></div>
+      <div class="btn round special" data-key="special"><span>S</span><small>SPECIAL</small></div>
     </div>
   </div>
-  <div class="hint">A/D move &middot; S crouch (ducks high kicks) &middot; W jump &middot; J punch &middot; K kick (also in the air) &middot; L special when the meter is full &middot; Enter start</div>
+  <div class="hint">A/D move &middot; S crouch (ducks high kicks) &middot; W jump &middot; J punch &middot; K kick (also in the air) &middot; L special when the meter is full &middot; Enter start &middot; On touch screens: &#9650; jumps</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
@@ -848,8 +854,8 @@
   var buttons = document.querySelectorAll("#pad .btn");
   Array.prototype.forEach.call(buttons, function (el) {
     var k = el.dataset.key;
-    function press(e) { e.preventDefault(); el.classList.add("down"); if (!input[k] && k in pressedThisFrame) pressedThisFrame[k] = true; input[k] = true; }
-    function release(e) { e.preventDefault(); el.classList.remove("down"); input[k] = false; }
+    function press(e) { e.preventDefault(); el.classList.add("pressed"); if (!input[k] && k in pressedThisFrame) pressedThisFrame[k] = true; input[k] = true; }
+    function release(e) { e.preventDefault(); el.classList.remove("pressed"); input[k] = false; }
     el.addEventListener("pointerdown", press);
     el.addEventListener("pointerup", release);
     el.addEventListener("pointercancel", release);
